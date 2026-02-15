@@ -1,4 +1,4 @@
-# CampusBite Canteen Management System 🍔
+# CampusBites - Canteen Management System 🍔
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg)](https://opensource.org/licenses/MIT)
 [![React](https://img.shields.io/badge/React-17.0.2-grey.svg)](https://reactjs.org/)
