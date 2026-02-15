@@ -10,6 +10,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Order } from "@/types/canteen";
+import { toast } from "sonner";
 
 export default function Menu() {
   const [itemsFromDB, setItemsFromDB] = useState<any[]>([]);
@@ -57,20 +58,45 @@ export default function Menu() {
           error.details
         );
       } else {
-        console.log("✅ Fetched items:", data);
-        setItemsFromDB(data || []);
+        setItemsFromDB(
+          (data || []).map((row: Record<string, unknown>) => ({
+            ...row,
+            image_url: row.image_url ?? null,
+          }))
+        );
       }
     } catch (err) {
       console.error("❌ Unexpected error fetching items:", err);
     }
   };
 
-  // Extract categories dynamically
+  // Category display names and icons
+  const categoryMeta: Record<string, { name: string; icon: string }> = {
+    all: { name: "All", icon: "🍽️" },
+    breakfast: { name: "Breakfast", icon: "🍳" },
+    main: { name: "Main", icon: "🍛" },
+    snacks: { name: "Snacks", icon: "🍟" },
+    beverages: { name: "Beverages", icon: "🥤" },
+    desserts: { name: "Desserts", icon: "🍰" },
+  };
+
   const categories = useMemo(() => {
-    const uniqueCategories = [
-      ...new Set(itemsFromDB.map((item) => item.category)),
+    const unique = [
+      ...new Set(
+        itemsFromDB
+          .map((item) => item.category)
+          .filter((c): c is string => c != null && c !== "")
+      ),
+    ].sort();
+    const list = [
+      { id: "all", name: categoryMeta.all.name, icon: categoryMeta.all.icon },
+      ...unique.map((id) => ({
+        id,
+        name: categoryMeta[id]?.name ?? id.charAt(0).toUpperCase() + id.slice(1),
+        icon: categoryMeta[id]?.icon ?? "🍽️",
+      })),
     ];
-    return ["all", ...uniqueCategories];
+    return list;
   }, [itemsFromDB]);
 
   // Filter items
@@ -89,7 +115,19 @@ export default function Menu() {
   const handleCheckout = async () => {
     if (items.length === 0) return;
     if (!user?.name) {
-      alert("❌ Please log in first");
+      toast.error("Please log in first");
+      return;
+    }
+
+    // Validate stock before placing order
+    const { data: currentItems } = await supabase.from("items").select("id, stock, is_available");
+    const stockMap = new Map((currentItems || []).map((i) => [i.id, { stock: i.stock, is_available: i.is_available }]));
+    const outOfStock = items.some((cartItem) => {
+      const item = stockMap.get(cartItem.id);
+      return !item || item.stock < cartItem.quantity || !item.is_available;
+    });
+    if (outOfStock) {
+      toast.error("One or more items are out of stock. Please update your cart.");
       return;
     }
 
@@ -116,7 +154,7 @@ export default function Menu() {
           orderError.message,
           orderError.details
         );
-        alert(`Error creating order: ${orderError.message}`);
+        toast.error(`Error creating order: ${orderError.message}`);
         return;
       }
 
@@ -140,7 +178,7 @@ export default function Menu() {
           itemsError.message,
           itemsError.details
         );
-        alert(`Error saving order items: ${itemsError.message}`);
+        toast.error(`Error saving order items: ${itemsError.message}`);
         return;
       }
 
@@ -159,9 +197,8 @@ export default function Menu() {
       clearCart();
     } catch (err) {
       console.error("❌ Unexpected error during checkout:", err);
-      alert(
-        "Unexpected error: " +
-          (err instanceof Error ? err.message : "Unknown error")
+      toast.error(
+        err instanceof Error ? err.message : "Something went wrong"
       );
     }
   };
@@ -187,7 +224,7 @@ export default function Menu() {
         </section>
 
         {/* Search */}
-        <div className="relative mb-6">
+        <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
@@ -198,7 +235,7 @@ export default function Menu() {
           />
         </div>
 
-        {/* Categories */}
+        {/* Categories: All, Snacks, etc. — directly below search */}
         <section className="mb-6">
           <CategoryFilter
             categories={categories}

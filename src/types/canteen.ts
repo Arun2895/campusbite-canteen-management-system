@@ -6,6 +6,8 @@ export interface MenuItem {
   stock: number;
   is_available: boolean;
   created_at?: string;
+  image_url?: string | null;
+  description?: string | null;
 }
 
 export interface CartItem extends MenuItem {

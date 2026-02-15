@@ -27,7 +27,7 @@ export function ProfileMenu({ onClose }: { onClose?: () => void }) {
           <ul className="text-sm space-y-1">
             <li>Active users: <strong>128</strong></li>
             <li>Orders today: <strong>42</strong></li>
-            <li>Revenue: <strong>$1,230</strong></li>
+            <li>Revenue: <strong>₹1,230</strong></li>
           </ul>
           <Link to="/admin" className="mt-3 inline-block text-sm text-primary">Open full dashboard</Link>
         </div>

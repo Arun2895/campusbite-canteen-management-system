@@ -61,6 +61,24 @@ CREATE TABLE order_items (
 );
 ```
 
+### 4. **Enable RLS policies (required for order status updates)**
+
+If accepting orders shows "Order status could not be updated" or RLS errors:
+
+1. In Supabase go to **SQL Editor** → **New query**
+2. Open the file `SUPABASE_RLS_FIX.sql` in this project, copy all its contents
+3. Paste into the SQL Editor and click **Run**
+4. You should see "Success. No rows returned." Policies are now in place for `orders`, `order_items`, and `items`
+
+Without these policies, the anon key cannot UPDATE the `orders` table (e.g. set status to "accepted").
+
+### 5. **Optional: Item images (admin Add Item)**
+
+To use the optional picture when adding menu items:
+
+1. Run `SUPABASE_ADD_ITEM_IMAGE.sql` in the SQL Editor (adds `image_url` column to `items`).
+2. For **file upload**: In Supabase go to **Storage** → **New bucket** → Name: `item-images`, set to **Public** → Create. Then add a policy that allows insert/update for your auth (e.g. "Allow all" for anon if your app uses anon key for uploads).
+
 ## 🔧 Troubleshooting
 
 ### Connection Fails
@@ -89,6 +107,7 @@ CREATE TABLE order_items (
 | `Invalid VITE_SUPABASE_URL` | Must start with `https://` |
 | `Failed to fetch items` | Check internet connection and Supabase status |
 | `Error creating order` | Check `orders` table exists with correct schema |
+| `Order status could not be updated` / RLS | Run `SUPABASE_RLS_FIX.sql` in Supabase SQL Editor (see step 4 above) |
 
 ## 🐛 Debug Mode
 

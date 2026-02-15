@@ -68,12 +68,18 @@ export function CartSheet({ open, onOpenChange, onCheckout }: CartSheetProps) {
                   role="listitem"
                 >
                   {/* Item image */}
-                  <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl bg-muted text-2xl">
-                    {item.category === 'breakfast' && '🍳'}
-                    {item.category === 'main' && '🍛'}
-                    {item.category === 'snacks' && '🍟'}
-                    {item.category === 'beverages' && '🥤'}
-                    {item.category === 'desserts' && '🍰'}
+                  <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-muted">
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-2xl">
+                        {item.category === 'breakfast' && '🍳'}
+                        {item.category === 'main' && '🍛'}
+                        {item.category === 'snacks' && '🍟'}
+                        {item.category === 'beverages' && '🥤'}
+                        {item.category === 'desserts' && '🍰'}
+                      </div>
+                    )}
                   </div>
 
                   {/* Item details */}
@@ -82,7 +88,7 @@ export function CartSheet({ open, onOpenChange, onCheckout }: CartSheetProps) {
                       <div>
                         <h4 className="font-medium line-clamp-1">{item.name}</h4>
                         <p className="text-sm text-primary font-semibold">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          ₹{(item.price * item.quantity).toFixed(2)}
                         </p>
                       </div>
                       <Button
@@ -133,23 +139,23 @@ export function CartSheet({ open, onOpenChange, onCheckout }: CartSheetProps) {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>₹{total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Service Fee</span>
-                  <span>$0.00</span>
+                  <span>₹0.00</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Total</span>
-                  <span className="text-primary">${total.toFixed(2)}</span>
+                  <span className="text-primary">₹{total.toFixed(2)}</span>
                 </div>
               </div>
 
               <Button
                 className="mt-4 w-full h-12 text-base font-semibold shadow-lg"
                 onClick={handleCheckout}
-                aria-label={`Proceed to checkout, total ${total.toFixed(2)} dollars`}
+                aria-label={`Proceed to checkout, total ₹${total.toFixed(2)}`}
               >
                 Proceed to Checkout
               </Button>

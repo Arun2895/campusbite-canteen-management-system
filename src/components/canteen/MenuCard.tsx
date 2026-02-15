@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Plus, AlertCircle } from 'lucide-react';
 import { MenuItem } from '@/types/canteen';
 import { Button } from '@/components/ui/button';
@@ -9,9 +10,20 @@ interface MenuCardProps {
   onAddToCart: (item: MenuItem) => void;
 }
 
+function CategoryEmoji({ category }: { category: string | null }) {
+  if (category === 'breakfast') return <>🍳</>;
+  if (category === 'main') return <>🍛</>;
+  if (category === 'snacks') return <>🍟</>;
+  if (category === 'beverages') return <>🥤</>;
+  if (category === 'desserts') return <>🍰</>;
+  return <>🍽️</>;
+}
+
 export function MenuCard({ item, onAddToCart }: MenuCardProps) {
+  const [imageFailed, setImageFailed] = useState(false);
   const isLowStock = item.stock > 0 && item.stock <= 5;
   const isOutOfStock = item.stock === 0 || !item.is_available;
+  const showImage = item.image_url && item.image_url.trim() !== '' && !imageFailed;
 
   return (
     <article
@@ -19,17 +31,27 @@ export function MenuCard({ item, onAddToCart }: MenuCardProps) {
         'group relative flex flex-col rounded-2xl bg-card p-4 shadow-card transition-smooth hover:shadow-lg',
         isOutOfStock && 'opacity-60'
       )}
-      aria-label={`${item.name}, ${item.price.toFixed(2)} dollars${isOutOfStock ? ', out of stock' : ''}`}
+      aria-label={`${item.name}, ₹${item.price.toFixed(2)}${isOutOfStock ? ', out of stock' : ''}`}
     >
-      {/* Image placeholder */}
+      {/* Image or placeholder */}
       <div className="relative mb-3 aspect-[4/3] overflow-hidden rounded-xl bg-muted">
-        <div className="absolute inset-0 flex items-center justify-center text-4xl">
-          {item.category === 'breakfast' && '🍳'}
-          {item.category === 'main' && '🍛'}
-          {item.category === 'snacks' && '🍟'}
-          {item.category === 'beverages' && '🥤'}
-          {item.category === 'desserts' && '🍰'}
-        </div>
+        {showImage ? (
+          <img
+            src={item.image_url!}
+            alt={item.name}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+            loading="lazy"
+            onError={(e) => {
+              console.error(`Failed to load image for ${item.name}:`, item.image_url);
+              e.currentTarget.style.display = 'none'; // Ensure broken image icon is hidden
+              setImageFailed(true);
+            }}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-4xl bg-muted/50">
+            <CategoryEmoji category={item.category} />
+          </div>
+        )}
         
         {/* Stock badge */}
         {isOutOfStock && (
@@ -62,8 +84,8 @@ export function MenuCard({ item, onAddToCart }: MenuCardProps) {
         </p>
         
         <div className="mt-auto flex items-center justify-between pt-3">
-          <span className="text-lg font-bold text-primary" aria-label={`Price: ${item.price.toFixed(2)} dollars`}>
-            ${item.price.toFixed(2)}
+          <span className="text-lg font-bold text-primary" aria-label={`Price: ₹${item.price.toFixed(2)}`}>
+            ₹{item.price.toFixed(2)}
           </span>
           
           <Button

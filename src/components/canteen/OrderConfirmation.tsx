@@ -73,12 +73,12 @@ export function OrderConfirmation({
                   <span className="text-muted-foreground">
                     {item.quantity}× {item.name}
                   </span>
-                  <span>${(item.price * item.quantity).toFixed(2)}</span>
+                  <span>₹{(item.price * item.quantity).toFixed(2)}</span>
                 </div>
               ))}
               <div className="flex justify-between border-t pt-2 font-semibold">
                 <span>Total Paid</span>
-                <span className="text-primary">${order.total.toFixed(2)}</span>
+                <span className="text-primary">₹{order.total.toFixed(2)}</span>
               </div>
             </div>
           </div>
