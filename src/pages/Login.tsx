@@ -14,7 +14,11 @@ export default function Login() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    signin(name || (role === "admin" ? "Admin" : "User"), role);
+    signin(
+      name || (role === "admin" ? "Admin" : "User"),
+      role,
+      role === "user" ? { college, studentClass, section, phone, regNo } : undefined
+    );
   };
 
   return (

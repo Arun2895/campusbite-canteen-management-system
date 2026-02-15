@@ -1,12 +1,11 @@
 export interface MenuItem {
   id: string;
   name: string;
-  description: string;
   price: number;
-  category: string;
-  image?: string;
+  category: string | null;
   stock: number;
-  isAvailable: boolean;
+  is_available: boolean;
+  created_at?: string;
 }
 
 export interface CartItem extends MenuItem {
@@ -20,7 +19,7 @@ export interface Order {
   status: 'pending' | 'preparing' | 'ready' | 'completed';
   counterNumber: number;
   createdAt: Date;
-  customerName?: string;
+  customerName: string;
 }
 
 export interface Category {

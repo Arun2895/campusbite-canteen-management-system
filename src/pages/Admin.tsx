@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft,
   Package,
@@ -6,11 +6,15 @@ import {
   ShoppingCart,
   Trash2,
   Plus,
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+  CheckCircle,
+  Clock,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -18,77 +22,243 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 
-import { menuItems as initialMenuItems } from '@/data/menuData';
-import { MenuItem } from '@/types/canteen';
-import { cn } from '@/lib/utils';
+interface Item {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  stock: number;
+  is_available: boolean;
+}
+
+interface Order {
+  id: string;
+  customer_name: string;
+  counter_number: number;
+  total_amount: number;
+  status: string;
+  created_at: string;
+}
 
 export default function Admin() {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
+  const [items, setItems] = useState<Item[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
+  const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
 
   const [newItem, setNewItem] = useState({
-    name: '',
-    category: '',
-    price: '',
-    stock: '',
+    name: "",
+    category: "",
+    price: "",
+    stock: "",
   });
 
-  /* ================= Dynamic Stats ================= */
+  useEffect(() => {
+    fetchItems();
+    fetchOrders();
+    
+    // Real-time listener for orders
+    const channel = supabase
+      .channel("orders-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          fetchOrders();
+        }
+      )
+      .subscribe();
 
-  const totalItemsInStock = useMemo(() => {
-    return menuItems.reduce((total, item) => total + item.stock, 0);
-  }, [menuItems]);
-
-  const stats = [
-    { label: 'Total Revenue', value: '$2,847.50', icon: DollarSign },
-    { label: 'Orders Today', value: '156', icon: ShoppingCart },
-    { label: 'Items in Stock', value: totalItemsInStock.toString(), icon: Package },
-  ];
-
-  /* ================= Add Item Logic ================= */
-
-  const handleAddItem = () => {
-    if (!newItem.name || !newItem.category || !newItem.price || !newItem.stock)
-      return;
-
-    const item: MenuItem = {
-      id: crypto.randomUUID(),
-      name: newItem.name,
-      description: `${newItem.name} - freshly prepared`,
-      category: newItem.category.toLowerCase(),
-      price: parseFloat(newItem.price),
-      stock: parseInt(newItem.stock),
-      isAvailable: parseInt(newItem.stock) > 0,
+    return () => {
+      supabase.removeChannel(channel);
     };
+  }, []);
 
-    setMenuItems(prev => [...prev, item]);
-    setNewItem({ name: '', category: '', price: '', stock: '' });
-    setIsAddDialogOpen(false);
+  const fetchItems = async () => {
+    try {
+      const { data, error } = await supabase.from("items").select("*");
+
+      if (error) {
+        console.error(
+          "❌ Failed to fetch items:",
+          error.message,
+          error.details
+        );
+        alert(`Error fetching items: ${error.message}`);
+      } else {
+        console.log("✅ Fetched items:", data);
+        setItems(data || []);
+      }
+    } catch (err) {
+      console.error("❌ Unexpected error fetching items:", err);
+      alert(
+        "Unexpected error: " +
+          (err instanceof Error ? err.message : "Unknown error")
+      );
+    }
   };
 
-  /* ================= Delete Item Logic ================= */
+  const totalItemsInStock = useMemo(() => {
+    return items.reduce((total, item) => total + item.stock, 0);
+  }, [items]);
 
-  const handleDeleteItem = () => {
+  const pendingOrdersCount = orders.filter(
+    (order) => order.status === "pending"
+  ).length;
+
+  const stats = [
+    { label: "Total Revenue", value: "₹0", icon: DollarSign },
+    { label: "Pending Orders", value: pendingOrdersCount.toString(), icon: ShoppingCart },
+    { label: "Items in Stock", value: totalItemsInStock.toString(), icon: Package },
+  ];
+
+  const handleAddItem = async () => {
+    if (!newItem.name || !newItem.category || !newItem.price || !newItem.stock) {
+      alert("⚠️ Please fill all fields");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("items")
+        .insert([
+          {
+            name: newItem.name,
+            category: newItem.category.toLowerCase(),
+            price: parseFloat(newItem.price),
+            stock: parseInt(newItem.stock),
+            is_available: parseInt(newItem.stock) > 0,
+          },
+        ])
+        .select();
+
+      if (error) {
+        console.error(
+          "❌ Failed to add item:",
+          error.message,
+          error.details
+        );
+        alert(`Failed to add item: ${error.message}`);
+      } else {
+        console.log("✅ Item added:", data);
+        alert("Item added successfully ✅");
+        fetchItems();
+        setNewItem({ name: "", category: "", price: "", stock: "" });
+        setIsAddDialogOpen(false);
+      }
+    } catch (err) {
+      console.error("❌ Unexpected error adding item:", err);
+      alert(
+        "Unexpected error: " +
+          (err instanceof Error ? err.message : "Unknown error")
+      );
+    }
+  };
+  const fetchOrders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error(
+          "❌ Failed to fetch orders:",
+          error.message,
+          error.details
+        );
+      } else {
+        console.log("✅ Fetched orders:", data);
+        setOrders(data || []);
+      }
+    } catch (err) {
+      console.error("❌ Unexpected error fetching orders:", err);
+    }
+  };
+
+  const handleAcceptOrder = async (orderId: string) => {
+    setAcceptingOrderId(orderId);
+    console.log("🔄 Accepting order:", orderId);
+    
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .update({ status: "accepted" })
+        .eq("id", orderId)
+        .select();
+
+      console.log("Response data:", data);
+      console.log("Response error:", error);
+
+      if (error) {
+        console.error(
+          "❌ Failed to accept order:",
+          error.message,
+          error.details,
+          error.hint
+        );
+        alert(`Failed to accept order: ${error.message}`);
+        return;
+      }
+
+      console.log("✅ Order accepted successfully:", data);
+      alert("Order accepted successfully ✅");
+      await fetchOrders();
+    } catch (err) {
+      console.error("❌ Unexpected error accepting order:", err);
+      alert(
+        "Unexpected error: " +
+          (err instanceof Error ? err.message : "Unknown error")
+      );
+    } finally {
+      setAcceptingOrderId(null);
+    }
+  };
+  const handleDeleteItem = async () => {
     if (!deleteItemId) return;
-    setMenuItems(prev => prev.filter(item => item.id !== deleteItemId));
-    setDeleteItemId(null);
+
+    try {
+      const { error } = await supabase
+        .from("items")
+        .delete()
+        .eq("id", deleteItemId);
+
+      if (error) {
+        console.error(
+          "❌ Failed to delete item:",
+          error.message,
+          error.details
+        );
+        alert(`Failed to delete item: ${error.message}`);
+      } else {
+        console.log("✅ Item deleted");
+        alert("Item deleted ✅");
+        fetchItems();
+        setDeleteItemId(null);
+      }
+    } catch (err) {
+      console.error("❌ Unexpected error deleting item:", err);
+      alert(
+        "Unexpected error: " +
+          (err instanceof Error ? err.message : "Unknown error")
+      );
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* ================= Header ================= */}
-      <header className="sticky top-0 z-40 glass border-b">
+      <header className="sticky top-0 z-40 border-b">
         <div className="container flex h-16 items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link to="/">
@@ -100,8 +270,6 @@ export default function Admin() {
       </header>
 
       <main className="container py-8 space-y-8">
-
-        {/* ================= Stats Section ================= */}
         <section>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
             {stats.map((stat) => (
@@ -114,9 +282,7 @@ export default function Admin() {
                       </p>
                       <p className="text-3xl font-bold">{stat.value}</p>
                     </div>
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                      <stat.icon className="h-7 w-7 text-primary" />
-                    </div>
+                    <stat.icon className="h-7 w-7 text-primary" />
                   </div>
                 </CardContent>
               </Card>
@@ -124,17 +290,80 @@ export default function Admin() {
           </div>
         </section>
 
-        {/* ================= Menu Management ================= */}
         <section>
           <Card className="max-w-6xl mx-auto">
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-orange-500" />
+                Pending Requests
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              {orders.filter((order) => order.status === "pending").length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No pending orders
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order ID</TableHead>
+                      <TableHead>Customer Name</TableHead>
+                      <TableHead>Counter</TableHead>
+                      <TableHead>Total Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orders
+                      .filter((order) => order.status === "pending")
+                      .map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell className="font-mono text-sm">
+                            {order.id.slice(0, 8)}
+                          </TableCell>
+                          <TableCell>{order.customer_name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-lg">
+                              {order.counter_number}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            ₹{order.total_amount}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className="bg-yellow-500 text-white">
+                              {order.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => handleAcceptOrder(order.id)}
+                              disabled={acceptingOrderId === order.id}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Accept
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section>
+          <Card className="max-w-6xl mx-auto">
+            <CardHeader className="flex-row items-center justify-between">
               <CardTitle>Menu Items</CardTitle>
-              <Button
-                size="sm"
-                className="gap-2"
-                onClick={() => setIsAddDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
+              <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
                 Add Item
               </Button>
             </CardHeader>
@@ -143,7 +372,7 @@ export default function Admin() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Item</TableHead>
+                    <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Stock</TableHead>
@@ -151,28 +380,18 @@ export default function Admin() {
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
-
                 <TableBody>
-                  {menuItems.map((item) => (
+                  {items.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>
-                        <div className="font-medium">{item.name}</div>
-                      </TableCell>
-                      <TableCell className="capitalize">
-                        {item.category}
-                      </TableCell>
-                      <TableCell>${item.price.toFixed(2)}</TableCell>
+                      <TableCell>{item.name}</TableCell>
+                      <TableCell>{item.category}</TableCell>
+                      <TableCell>₹{item.price}</TableCell>
                       <TableCell>{item.stock}</TableCell>
                       <TableCell>
                         {item.stock === 0 ? (
-                          <Badge variant="destructive">
-                            Out of Stock
-                          </Badge>
+                          <Badge variant="destructive">Out</Badge>
                         ) : (
-                          <Badge
-                            variant="secondary"
-                            className="bg-success/10 text-success"
-                          >
+                          <Badge className="bg-green-500 text-white">
                             In Stock
                           </Badge>
                         )}
@@ -181,10 +400,9 @@ export default function Admin() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={() => setDeleteItemId(item.id)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -196,9 +414,8 @@ export default function Admin() {
         </section>
       </main>
 
-      {/* ================= Add Item Dialog ================= */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Item</DialogTitle>
           </DialogHeader>
@@ -212,7 +429,7 @@ export default function Admin() {
               }
             />
             <Input
-              placeholder="Category (snacks, drinks, etc.)"
+              placeholder="Category"
               value={newItem.category}
               onChange={(e) =>
                 setNewItem({ ...newItem, category: e.target.value })
@@ -237,41 +454,25 @@ export default function Admin() {
           </div>
 
           <DialogFooter className="mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setIsAddDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddItem}>
-              Add Item
-            </Button>
+            <Button onClick={handleAddItem}>Add Item</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ================= Delete Confirmation Dialog ================= */}
       <Dialog open={!!deleteItemId} onOpenChange={() => setDeleteItemId(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Item</DialogTitle>
           </DialogHeader>
 
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete this item? This action cannot be undone.
-          </p>
-
-          <DialogFooter className="mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteItemId(null)}
-            >
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteItemId(null)}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteItem}
-            >
+            <Button variant="destructive" onClick={handleDeleteItem}>
               Delete
             </Button>
           </DialogFooter>

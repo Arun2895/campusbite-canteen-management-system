@@ -18,7 +18,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
 
   const addItem = useCallback((item: MenuItem) => {
-    if (!item.isAvailable || item.stock === 0) {
+    if (!item.is_available || item.stock === 0) {
       toast.error('This item is currently out of stock');
       return;
     }

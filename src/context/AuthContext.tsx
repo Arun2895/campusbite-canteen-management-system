@@ -6,11 +6,16 @@ type Role = "admin" | "user";
 type User = {
   name: string;
   role: Role;
+  college?: string;
+  studentClass?: string;
+  section?: string;
+  phone?: string;
+  regNo?: string;
 };
 
 type AuthContextValue = {
   user: User | null;
-  signin: (name: string, role: Role) => void;
+  signin: (name: string, role: Role, customerData?: Omit<User, 'name' | 'role'>) => void;
   signout: () => void;
 };
 
@@ -20,8 +25,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const navigate = useNavigate();
 
-  const signin = (name: string, role: Role) => {
-    setUser({ name, role });
+  const signin = (name: string, role: Role, customerData?: Omit<User, 'name' | 'role'>) => {
+    setUser({ name, role, ...customerData });
     // simple redirect: admins go to /admin, users go home
     if (role === "admin") navigate("/admin");
     else navigate("/");

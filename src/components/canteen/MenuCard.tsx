@@ -11,7 +11,7 @@ interface MenuCardProps {
 
 export function MenuCard({ item, onAddToCart }: MenuCardProps) {
   const isLowStock = item.stock > 0 && item.stock <= 5;
-  const isOutOfStock = item.stock === 0 || !item.isAvailable;
+  const isOutOfStock = item.stock === 0 || !item.is_available;
 
   return (
     <article
